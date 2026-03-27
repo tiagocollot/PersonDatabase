@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Person Database</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Person Database</h1>
+        
+        <div class="card">
+            <h2>Add New Person</h2>
+            <form id="addForm">
+                <div class="form-grid">
+                    <input type="text" name="name" placeholder="Name" required>
+                    <input type="number" name="age" placeholder="Age" min="0" required>
+                    <input type="text" name="profession" placeholder="Profession" required>
+                    <input type="text" name="city" placeholder="City" required>
+                </div>
+                <div id="formMessage"></div>
+                <button type="submit" class="btn-primary" style="margin-top:15px">Add Person</button>
+            </form>
+        </div>
+
+        <div class="card hidden" id="editForm">
+            <h2>Edit Person</h2>
+            <form id="editPersonForm">
+                <input type="hidden" id="editId">
+                <div class="form-grid">
+                    <input type="text" id="editName" required>
+                    <input type="number" id="editAge" min="0" required>
+                    <input type="text" id="editProfession" required>
+                    <input type="text" id="editCity" required>
+                </div>
+                <div style="margin-top:15px">
+                    <button type="submit" class="btn-primary">Save Changes</button>
+                    <button type="button" class="btn-danger" onclick="cancelEdit()">Cancel</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>People List</h2>
+            <div id="message"></div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Age</th>
+                        <th>Profession</th>
+                        <th>City</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="peopleTable"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const API = '/api/people';
+
+        document.getElementById('addForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const form = e.target;
+            const data = {
+                name: form.name.value,
+                age: parseInt(form.age.value),
+                profession: form.profession.value,
+                city: form.city.value
+            };
+            try {
+                const res = await fetch(API, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await res.json();
+                if (result.success) {
+                    form.reset();
+                    loadPeople();
+                    showFormMessage('Person added successfully!', 'success');
+                } else {
+                    showFormMessage(result.error, 'error');
+                }
+            } catch (err) {
+                showFormMessage('Failed to add person', 'error');
+            }
+        });
+
+        document.getElementById('editPersonForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const id = document.getElementById('editId').value;
+            const data = {
+                name: document.getElementById('editName').value,
+                age: parseInt(document.getElementById('editAge').value),
+                profession: document.getElementById('editProfession').value,
+                city: document.getElementById('editCity').value
+            };
+            try {
+                const res = await fetch(API + '/' + id, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await res.json();
+                if (result.success) {
+                    cancelEdit();
+                    loadPeople();
+                    showMessage('Person updated successfully!', 'success');
+                } else {
+                    showMessage(result.error || 'Failed to update', 'error');
+                }
+            } catch (err) {
+                showMessage('Failed to update person', 'error');
+            }
+        });
+
+        async function editPerson(id) {
+            try {
+                const res = await fetch(API + '/' + id);
+                const data = await res.json();
+                if (data.error) {
+                    showMessage(data.error, 'error');
+                    return;
+                }
+                document.getElementById('editId').value = data.id;
+                document.getElementById('editName').value = data.name;
+                document.getElementById('editAge').value = data.age;
+                document.getElementById('editProfession').value = data.profession;
+                document.getElementById('editCity').value = data.city;
+                document.getElementById('editForm').classList.remove('hidden');
+                window.scrollTo(0, 0);
+            } catch (err) {
+                showMessage('Failed to load person', 'error');
+            }
+        }
+
+        function cancelEdit() {
+            document.getElementById('editForm').classList.add('hidden');
+            document.getElementById('editPersonForm').reset();
+        }
+
+        async function deletePerson(id) {
+            if (!confirm('Are you sure you want to delete this person?')) return;
+            try {
+                const res = await fetch(API + '/' + id, { method: 'DELETE' });
+                const result = await res.json();
+                if (result.success) {
+                    loadPeople();
+                    showMessage('Person deleted successfully!', 'success');
+                } else {
+                    showMessage(result.error || 'Failed to delete', 'error');
+                }
+            } catch (err) {
+                showMessage('Failed to delete person', 'error');
+            }
+        }
+
+        function showMessage(msg, type) {
+            const div = document.getElementById('message');
+            div.className = type;
+            div.textContent = msg;
+            div.style.display = 'block';
+            setTimeout(function() { div.style.display = 'none'; }, 3000);
+        }
+
+        function showFormMessage(msg, type) {
+            const div = document.getElementById('formMessage');
+            div.className = type;
+            div.textContent = msg;
+            div.style.display = 'block';
+            setTimeout(function() { div.style.display = 'none'; }, 3000);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function loadPeople() {
+            try {
+                const res = await fetch(API);
+                const data = await res.json();
+                const tbody = document.getElementById('peopleTable');
+                tbody.innerHTML = data.map(function(p) {
+                    return '<tr>' +
+                        '<td>' + p.id + '</td>' +
+                        '<td>' + escapeHtml(p.name) + '</td>' +
+                        '<td>' + p.age + '</td>' +
+                        '<td>' + escapeHtml(p.profession) + '</td>' +
+                        '<td>' + escapeHtml(p.city) + '</td>' +
+                        '<td class="timestamp">' + new Date(p.createdAt).toLocaleString() + '</td>' +
+                        '<td class="actions">' +
+                            '<button class="btn-edit" onclick="editPerson(' + p.id + ')">Edit</button>' +
+                            '<button class="btn-danger" onclick="deletePerson(' + p.id + ')">Delete</button>' +
+                        '</td>' +
+                    '</tr>';
+                }).join('');
+            } catch (err) {
+                showMessage('Failed to load people', 'error');
+            }
+        }
+
+        loadPeople();
+    </script>
+</body>
+</html>

@@ -16,7 +16,7 @@ All features were developed using TDD:
 - **JDK 17+** - [Install](https://adoptium.net/)
 - **PostgreSQL** - [Install](https://www.postgresql.org/download/)
 - **pgAdmin 4** - [Download](https://www.pgadmin.org/download/)
-- **Gradle 8+** (wrapper included)
+- **Gradle 8.10** (wrapper included)
 
 ## Setup
 
@@ -63,26 +63,98 @@ psql -U postgres -d persondb -c "SELECT 1;"
 You should see:
 ```
  ?column?
-----------
+ ----------
         1
 (1 row)
 ```
 
-### 4. Build & Run
+## Running the Application
 
+### Web Interface (Recommended)
+
+1. Build the project:
+   ```bash
+   cd ~/Desktop/PersonDatabase
+   ./gradlew build
+   ```
+
+2. Run the web server:
+   ```bash
+   ./gradlew run
+   ```
+
+3. Open your browser to: **http://localhost:4567**
+
+The web interface allows you to:
+- **View** all people in a table
+- **Add** new people with a form
+- **Edit** existing people
+- **Delete** people
+- See **created_at** timestamps
+
+### CLI Demo
+
+To run the command-line demo instead:
+
+1. Edit `build.gradle.kts` and change:
+   ```kotlin
+   application {
+       mainClass.set("com.example.MainKt")
+   }
+   ```
+
+2. Run:
+   ```bash
+   ./gradlew run
+   ```
+
+### Seed Database with 20 Sample Users
+
+To populate the database with 20 sample people:
+
+1. Edit `build.gradle.kts` and change:
+   ```kotlin
+   application {
+       mainClass.set("com.example.SeedDatabaseKt")
+   }
+   ```
+
+2. Run:
+   ```bash
+   ./gradlew run
+   ```
+
+### REST API Endpoints
+
+When running the web server, the following API endpoints are available:
+
+| Method | Endpoint            | Description          |
+|--------|---------------------|----------------------|
+| GET    | `/`                | Web interface        |
+| GET    | `/api/people`       | Get all people       |
+| GET    | `/api/people/:id`   | Get person by ID    |
+| POST   | `/api/people`       | Create new person   |
+| PUT    | `/api/people/:id`   | Update person        |
+| DELETE | `/api/people/:id`   | Delete person       |
+
+**Example API usage:**
 ```bash
-cd ~/Desktop/PersonDatabase
-./gradlew build
-./gradlew run
-```
+# Get all people
+curl http://localhost:4567/api/people
 
-**To populate with 20 sample users:** Edit `build.gradle.kts` and change:
-```kotlin
-application {
-    mainClass.set("com.example.SeedDatabaseKt")
-}
+# Create a person
+curl -X POST http://localhost:4567/api/people \
+  -H "Content-Type: application/json" \
+  -d '{"name":"John Doe","age":30,"profession":"Developer","city":"NYC"}'
+
+# Update a person
+curl -X PUT http://localhost:4567/api/people/1 \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Jane Doe","age":31,"profession":"Senior Dev","city":"LA"}'
+
+# Delete a person
+curl -X DELETE http://localhost:4567/api/people/1
 ```
-Then run `./gradlew run`.
 
 ## Using pgAdmin 4
 
@@ -199,17 +271,47 @@ DELETE FROM people;
 src/main/kotlin/com/example/
 ├── Person.kt              # Data class
 ├── PersonRepository.kt    # Database operations (JDBC)
-├── PersonService.kt       # Business logic with validation
-├── DatabaseConfig.kt      # Database connection
-├── Main.kt                # CLI demo
-└── SeedDatabase.kt        # Populate 20 sample users
+├── PersonService.kt      # Business logic with validation
+├── DatabaseConfig.kt     # Database connection
+├── Main.kt               # CLI demo
+├── SeedDatabase.kt       # Populate 20 sample users
+└── WebServer.kt          # Web interface (SparkJava + Handlebars)
+
+src/main/resources/
+├── public/
+│   └── styles.css        # External stylesheet
+└── templates/
+    └── index.hbs         # Handlebars template for web interface
 
 src/test/kotlin/com/example/
-├── PersonRepositoryTest.kt # Repository tests
-└── PersonServiceTest.kt    # Service tests
+├── PersonRepositoryTest.kt        # Repository unit tests (14)
+├── PersonServiceTest.kt           # Service unit tests (22)
+├── HandlebarsTest.kt             # Template tests (13)
+└── WebServerIntegrationTest.kt   # Integration tests (11)
 ```
 
 ## Database Schema
+
+> **⚠️ WARNING: Deleting the Database**
+> 
+> **If you delete the `persondb` database, all data will be permanently lost!** 
+> 
+> The application will automatically re-seed the database with 20 sample users when restarted, but any custom data you added will be gone.
+> 
+> To delete the database:
+> ```bash
+> # Stop the application first!
+> dropdb -U postgres persondb
+> ```
+> 
+> To recreate after deletion:
+> ```bash
+> # Recreate the database
+> psql -U postgres -c "CREATE DATABASE persondb OWNER postgres;"
+> 
+> # Start the application - it will auto-seed the data
+> ./gradlew run
+> ```
 
 ```sql
 CREATE TABLE people (
@@ -238,6 +340,17 @@ CREATE TABLE people (
 ```bash
 ./gradlew test
 ```
+
+**Test Summary:**
+| Test Class | Tests |
+|------------|-------|
+| PersonRepositoryTest.kt | 14 |
+| PersonServiceTest.kt | 22 |
+| HandlebarsTest.kt | 13 |
+| WebServerIntegrationTest.kt | 11 |
+| **Total** | **60** |
+
+**Note:** Integration tests require PostgreSQL running. Ensure the database is available before running tests.
 
 ## Troubleshooting
 
@@ -270,3 +383,11 @@ CREATE TABLE people (
 **Table not visible:**
 - Right-click on **Tables** and select **Refresh**
 - Make sure you have selected the correct database (`persondb`)
+
+**Web server port already in use:**
+- Stop any running instances: `lsof -ti:4567 | xargs kill 2>/dev/null || true`
+- Or change the port in `WebServer.kt` (line 46: `port(4567)`)
+
+**Template not found error:**
+- Ensure Handlebars templates are in `src/main/resources/templates/`
+- Template files must have `.hbs` extension

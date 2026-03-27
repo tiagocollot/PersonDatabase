@@ -1,7 +1,7 @@
 package com.example
 
 import java.sql.ResultSet
-import java.time.LocalDateTime
+
 
 interface PersonRepositoryInterface {
     fun save(person: Person): Person
