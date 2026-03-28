@@ -14,10 +14,10 @@
             <h2>Add New Person</h2>
             <form id="addForm">
                 <div class="form-grid">
-                    <input type="text" name="name" placeholder="Name" required>
-                    <input type="number" name="age" placeholder="Age" min="0" required>
-                    <input type="text" name="profession" placeholder="Profession" required>
-                    <input type="text" name="city" placeholder="City" required>
+                    <input type="text" name="name" placeholder="Name" required maxlength="255">
+                    <input type="number" name="age" placeholder="Age" min="0" max="150" required>
+                    <input type="text" name="profession" placeholder="Profession" required maxlength="255">
+                    <input type="text" name="city" placeholder="City" required maxlength="255">
                 </div>
                 <div id="formMessage"></div>
                 <button type="submit" class="btn-primary" style="margin-top:15px">Add Person</button>
@@ -29,10 +29,10 @@
             <form id="editPersonForm">
                 <input type="hidden" id="editId">
                 <div class="form-grid">
-                    <input type="text" id="editName" required>
-                    <input type="number" id="editAge" min="0" required>
-                    <input type="text" id="editProfession" required>
-                    <input type="text" id="editCity" required>
+                    <input type="text" id="editName" required maxlength="255">
+                    <input type="number" id="editAge" min="0" max="150" required>
+                    <input type="text" id="editProfession" required maxlength="255">
+                    <input type="text" id="editCity" required maxlength="255">
                 </div>
                 <div style="margin-top:15px">
                     <button type="submit" class="btn-primary">Save Changes</button>
@@ -44,19 +44,66 @@
         <div class="card">
             <h2>People List</h2>
             <div id="message"></div>
+            
+            <div class="controls">
+                <form method="get" action="/" class="search-form">
+                    <input type="text" name="search" placeholder="Search by name, profession, or city..." value="{{search}}" maxlength="100">
+                    <input type="hidden" name="sort" value="{{sortBy}}">
+                    <input type="hidden" name="order" value="{{order}}">
+                    <button type="submit" class="btn-primary">Search</button>
+                    {{#if isFiltered}}
+                    <a href="/" class="btn-secondary">Clear</a>
+                    {{/if}}
+                </form>
+                <div class="count">
+                    {{#if isFiltered}}
+                        Showing {{filteredCount}} of {{totalCount}} people
+                    {{else}}
+                        {{totalCount}} people
+                    {{/if}}
+                </div>
+            </div>
+
             <table>
                 <thead>
                     <tr>
-                        <th>ID</th>
-                        <th>Name</th>
-                        <th>Age</th>
-                        <th>Profession</th>
-                        <th>City</th>
-                        <th>Created</th>
+                        <th><a href="?sort=id&order=desc{{#if search}}&search={{search}}{{/if}}">ID</a></th>
+                        <th><a href="?sort=name&order=asc{{#if search}}&search={{search}}{{/if}}">Name</a></th>
+                        <th><a href="?sort=age&order=asc{{#if search}}&search={{search}}{{/if}}">Age</a></th>
+                        <th><a href="?sort=profession&order=asc{{#if search}}&search={{search}}{{/if}}">Profession</a></th>
+                        <th><a href="?sort=city&order=asc{{#if search}}&search={{search}}{{/if}}">City</a></th>
+                        <th><a href="?sort=created&order=desc{{#if search}}&search={{search}}{{/if}}">Created</a></th>
                         <th>Actions</th>
                     </tr>
                 </thead>
-                <tbody id="peopleTable"></tbody>
+                <tbody>
+                    {{#if people}}
+                        {{#each people}}
+                        <tr>
+                            <td>{{id}}</td>
+                            <td>{{name}}</td>
+                            <td>{{age}}</td>
+                            <td>{{profession}}</td>
+                            <td>{{city}}</td>
+                            <td class="timestamp">{{formatDate createdAt}}</td>
+                            <td class="actions">
+                                <button type="button" class="btn-edit" onclick="editPerson({{id}}, '{{jsEscape name}}', {{age}}, '{{jsEscape profession}}', '{{jsEscape city}}')">Edit</button>
+                                <button type="button" class="btn-danger" onclick="deletePerson({{id}})">Delete</button>
+                            </td>
+                        </tr>
+                        {{/each}}
+                    {{else}}
+                        <tr>
+                            <td colspan="7" class="empty-state">
+                                {{#if search}}
+                                    No people found matching "{{search}}"
+                                {{else}}
+                                    No people yet. Add one above!
+                                {{/if}}
+                            </td>
+                        </tr>
+                    {{/if}}
+                </tbody>
             </table>
         </div>
     </div>
@@ -68,10 +115,10 @@
             e.preventDefault();
             const form = e.target;
             const data = {
-                name: form.name.value,
+                name: form.name.value.trim(),
                 age: parseInt(form.age.value),
-                profession: form.profession.value,
-                city: form.city.value
+                profession: form.profession.value.trim(),
+                city: form.city.value.trim()
             };
             try {
                 const res = await fetch(API, {
@@ -82,8 +129,8 @@
                 const result = await res.json();
                 if (result.success) {
                     form.reset();
-                    loadPeople();
                     showFormMessage('Person added successfully!', 'success');
+                    setTimeout(() => location.reload(), 1000);
                 } else {
                     showFormMessage(result.error, 'error');
                 }
@@ -96,10 +143,10 @@
             e.preventDefault();
             const id = document.getElementById('editId').value;
             const data = {
-                name: document.getElementById('editName').value,
+                name: document.getElementById('editName').value.trim(),
                 age: parseInt(document.getElementById('editAge').value),
-                profession: document.getElementById('editProfession').value,
-                city: document.getElementById('editCity').value
+                profession: document.getElementById('editProfession').value.trim(),
+                city: document.getElementById('editCity').value.trim()
             };
             try {
                 const res = await fetch(API + '/' + id, {
@@ -110,8 +157,8 @@
                 const result = await res.json();
                 if (result.success) {
                     cancelEdit();
-                    loadPeople();
                     showMessage('Person updated successfully!', 'success');
+                    setTimeout(() => location.reload(), 1000);
                 } else {
                     showMessage(result.error || 'Failed to update', 'error');
                 }
@@ -120,24 +167,14 @@
             }
         });
 
-        async function editPerson(id) {
-            try {
-                const res = await fetch(API + '/' + id);
-                const data = await res.json();
-                if (data.error) {
-                    showMessage(data.error, 'error');
-                    return;
-                }
-                document.getElementById('editId').value = data.id;
-                document.getElementById('editName').value = data.name;
-                document.getElementById('editAge').value = data.age;
-                document.getElementById('editProfession').value = data.profession;
-                document.getElementById('editCity').value = data.city;
-                document.getElementById('editForm').classList.remove('hidden');
-                window.scrollTo(0, 0);
-            } catch (err) {
-                showMessage('Failed to load person', 'error');
-            }
+        function editPerson(id, name, age, profession, city) {
+            document.getElementById('editId').value = id;
+            document.getElementById('editName').value = name;
+            document.getElementById('editAge').value = age;
+            document.getElementById('editProfession').value = profession;
+            document.getElementById('editCity').value = city;
+            document.getElementById('editForm').classList.remove('hidden');
+            window.scrollTo(0, 0);
         }
 
         function cancelEdit() {
@@ -151,8 +188,8 @@
                 const res = await fetch(API + '/' + id, { method: 'DELETE' });
                 const result = await res.json();
                 if (result.success) {
-                    loadPeople();
                     showMessage('Person deleted successfully!', 'success');
+                    setTimeout(() => location.reload(), 1000);
                 } else {
                     showMessage(result.error || 'Failed to delete', 'error');
                 }
@@ -176,38 +213,6 @@
             div.style.display = 'block';
             setTimeout(function() { div.style.display = 'none'; }, 3000);
         }
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        async function loadPeople() {
-            try {
-                const res = await fetch(API);
-                const data = await res.json();
-                const tbody = document.getElementById('peopleTable');
-                tbody.innerHTML = data.map(function(p) {
-                    return '<tr>' +
-                        '<td>' + p.id + '</td>' +
-                        '<td>' + escapeHtml(p.name) + '</td>' +
-                        '<td>' + p.age + '</td>' +
-                        '<td>' + escapeHtml(p.profession) + '</td>' +
-                        '<td>' + escapeHtml(p.city) + '</td>' +
-                        '<td class="timestamp">' + new Date(p.createdAt).toLocaleString() + '</td>' +
-                        '<td class="actions">' +
-                            '<button class="btn-edit" onclick="editPerson(' + p.id + ')">Edit</button>' +
-                            '<button class="btn-danger" onclick="deletePerson(' + p.id + ')">Delete</button>' +
-                        '</td>' +
-                    '</tr>';
-                }).join('');
-            } catch (err) {
-                showMessage('Failed to load people', 'error');
-            }
-        }
-
-        loadPeople();
     </script>
 </body>
 </html>

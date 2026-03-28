@@ -56,6 +56,13 @@ class PersonServiceTest {
     }
 
     @Test
+    fun `createPerson throws when age exceeds maximum`() {
+        assertThrows<IllegalArgumentException> {
+            service.createPerson("John", 151, "Dev", "NYC")
+        }
+    }
+
+    @Test
     fun `createPerson throws when profession is blank`() {
         assertThrows<IllegalArgumentException> {
             service.createPerson("John", 30, "", "NYC")

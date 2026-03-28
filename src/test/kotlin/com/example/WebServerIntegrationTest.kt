@@ -13,6 +13,7 @@ import com.google.gson.stream.JsonReader
 import com.google.gson.stream.JsonWriter
 import java.time.format.DateTimeFormatter
 import com.github.jknack.handlebars.Handlebars
+import com.github.jknack.handlebars.Options
 import com.github.jknack.handlebars.io.ClassPathTemplateLoader
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
@@ -270,19 +271,87 @@ class WebServerIntegrationTest {
 }
 
 object WebServerMain {
-    private val handlebars = Handlebars(ClassPathTemplateLoader("/templates", ".hbs"))
-        .registerHelper("escape") { context: Any, _: Any? ->
-            context.toString()
-        }
-        .registerHelper("formatDate") { context: Any, _: Any? ->
-            if (context is String) {
-                try {
-                    LocalDateTime.parse(context).toLocalDate().toString()
-                } catch (e: Exception) {
-                    context
+    private val handlebars = createHandlebarsTest()
+
+    private fun createHandlebarsTest(): Handlebars {
+        val hbs = Handlebars(ClassPathTemplateLoader("/templates", ".hbs"))
+        
+        hbs.registerHelper("htmlEscape", object : com.github.jknack.handlebars.Helper<Any?> {
+            override fun apply(context: Any?, options: Options): Any {
+                val str = context?.toString() ?: return ""
+                return str
+                    .replace("&", "&amp;")
+                    .replace("<", "&lt;")
+                    .replace(">", "&gt;")
+                    .replace("\"", "&quot;")
+                    .replace("'", "&#x27;")
+            }
+        })
+        
+        hbs.registerHelper("jsEscape", object : com.github.jknack.handlebars.Helper<Any?> {
+            override fun apply(context: Any?, options: Options): Any {
+                val str = context?.toString() ?: return ""
+                return str
+                    .replace("\\", "\\\\")
+                    .replace("'", "\\'")
+                    .replace("\"", "\\\"")
+                    .replace("\n", "\\n")
+                    .replace("\r", "\\r")
+                    .replace("\t", "\\t")
+            }
+        })
+        
+        hbs.registerHelper("formatDate", object : com.github.jknack.handlebars.Helper<Any?> {
+            override fun apply(context: Any?, options: Options): Any {
+                if (context == null) return ""
+                return when (context) {
+                    is LocalDateTime -> context.toLocalDate().toString()
+                    is String -> {
+                        try { LocalDateTime.parse(context).toLocalDate().toString() }
+                        catch (e: Exception) { context }
+                    }
+                    else -> context.toString()
                 }
-            } else context.toString()
+            }
+        })
+        
+        hbs.registerHelper("eq", object : com.github.jknack.handlebars.Helper<Any?> {
+            override fun apply(context: Any?, options: Options): Any {
+                if (context == null) return options.inverse()
+                val args = options.params
+                return if (args.isNotEmpty() && context.toString() == args[0].toString()) {
+                    options.fn()
+                } else {
+                    options.inverse()
+                }
+            }
+        })
+        
+        return hbs
+    }
+
+    private fun sanitizeSearchQuery(input: String): String {
+        return input
+            .take(100)
+            .replace(Regex("[<>\"'&]"), "")
+            .trim()
+    }
+
+    private fun sanitizeSortParam(input: String): String {
+        return when (input.lowercase()) {
+            "id", "name", "age", "profession", "city", "created" -> input.lowercase()
+            else -> "id"
         }
+    }
+
+    private fun htmlEscape(input: String): String {
+        return input
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&#x27;")
+    }
 
     fun startServer() {
         val dbUrl = System.getenv("DB_URL") ?: "jdbc:postgresql://localhost:5432/persondb"
@@ -300,10 +369,44 @@ object WebServerMain {
         Spark.port(4567)
         Spark.staticFiles.location("/public")
 
-        Spark.get("/") { _, _ ->
-            val people = service.getAllPeople()
+        Spark.get("/") { req, _ ->
+            val search = sanitizeSearchQuery(req.queryParams("search") ?: "")
+            val sortBy = sanitizeSortParam(req.queryParams("sort") ?: "id")
+            val order = if (req.queryParams("order") == "desc") "desc" else "asc"
+
+            var people = service.getAllPeople()
+
+            if (search.isNotBlank()) {
+                val searchLower = search.lowercase()
+                people = people.filter {
+                    it.name.lowercase().contains(searchLower) ||
+                    it.profession.lowercase().contains(searchLower) ||
+                    it.city.lowercase().contains(searchLower)
+                }
+            }
+
+            people = when (sortBy) {
+                "name" -> if (order == "asc") people.sortedBy { it.name } else people.sortedByDescending { it.name }
+                "age" -> if (order == "asc") people.sortedBy { it.age } else people.sortedByDescending { it.age }
+                "profession" -> if (order == "asc") people.sortedBy { it.profession } else people.sortedByDescending { it.profession }
+                "city" -> if (order == "asc") people.sortedBy { it.city } else people.sortedByDescending { it.city }
+                "created" -> if (order == "asc") people.sortedBy { it.createdAt } else people.sortedByDescending { it.createdAt }
+                else -> if (order == "asc") people.sortedBy { it.id } else people.sortedByDescending { it.id }
+            }
+
+            val totalCount = service.getAllPeople().size
+            val filteredCount = people.size
+
             val template = handlebars.compile("index")
-            template.apply(mapOf("people" to people))
+            template.apply(mapOf(
+                "people" to people,
+                "search" to search,
+                "sortBy" to sortBy,
+                "order" to order,
+                "totalCount" to totalCount,
+                "filteredCount" to filteredCount,
+                "isFiltered" to (search.isNotBlank() || sortBy != "id")
+            ))
         }
 
         Spark.get("/api/people") { _, _ ->

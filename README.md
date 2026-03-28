@@ -87,10 +87,26 @@ You should see:
 
 The web interface allows you to:
 - **View** all people in a table
+- **Search** people by name, profession, or city
+- **Sort** by any column (ID, name, age, profession, city, created date)
 - **Add** new people with a form
 - **Edit** existing people
 - **Delete** people
 - See **created_at** timestamps
+
+### Search and Sort
+
+The web interface supports server-side filtering and sorting:
+
+| Feature | URL Example |
+|---------|-------------|
+| Search | `http://localhost:4567/?search=developer` |
+| Sort by name | `http://localhost:4567/?sort=name&order=asc` |
+| Combined | `http://localhost:4567/?search=dev&sort=age&order=desc` |
+
+**Sort parameters:**
+- `sort` - Column to sort by: `id`, `name`, `age`, `profession`, `city`, `created`
+- `order` - Sort order: `asc` or `desc`
 
 ### CLI Demo
 
@@ -345,10 +361,10 @@ CREATE TABLE people (
 | Test Class | Tests |
 |------------|-------|
 | PersonRepositoryTest.kt | 14 |
-| PersonServiceTest.kt | 22 |
-| HandlebarsTest.kt | 13 |
+| PersonServiceTest.kt | 23 |
+| HandlebarsTest.kt | 22 |
 | WebServerIntegrationTest.kt | 11 |
-| **Total** | **60** |
+| **Total** | **70** |
 
 **Note:** Integration tests require PostgreSQL running. Ensure the database is available before running tests.
 

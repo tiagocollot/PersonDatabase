@@ -9,10 +9,10 @@ This document outlines all test categories and their coverage.
 | Test Class | Type | Count | Purpose |
 |------------|------|-------|---------|
 | PersonRepositoryTest.kt | Unit | 14 | Test data layer with in-memory repository |
-| PersonServiceTest.kt | Unit | 22 | Test business logic with mocked repository |
-| HandlebarsTest.kt | Unit | 13 | Test Handlebars template rendering |
+| PersonServiceTest.kt | Unit | 23 | Test business logic with mocked repository |
+| HandlebarsTest.kt | Unit | 22 | Test Handlebars template rendering |
 | WebServerIntegrationTest.kt | Integration | 11 | Test full HTTP endpoints with database |
-| **Total** | | **60** | |
+| **Total** | | **70** | |
 
 ---
 
@@ -55,7 +55,7 @@ Uses `InMemoryPersonRepository` - a mock implementation of `PersonRepositoryInte
 
 ---
 
-## 2. PersonServiceTest.kt (22 Tests)
+## 2. PersonServiceTest.kt (23 Tests)
 
 **Purpose:** Unit tests for business logic layer using a mock repository.
 
@@ -65,7 +65,7 @@ Uses `InMemoryPersonRepository` - a mock implementation of `PersonRepositoryInte
 |----------|-------|-------------|
 | **Create - Valid** | 2 | Creating persons with valid data |
 | **Create - Name Validation** | 2 | Rejecting blank/empty names |
-| **Create - Age Validation** | 2 | Rejecting negative ages, accepting zero |
+| **Create - Age Validation** | 3 | Rejecting negative ages, max age, accepting zero |
 | **Create - Profession Validation** | 2 | Rejecting blank/whitespace professions |
 | **Create - City Validation** | 2 | Rejecting blank/whitespace cities |
 | **Create - Whitespace Trimming** | 1 | Trimming input whitespace |
@@ -82,6 +82,7 @@ createPerson throws when name is blank
 createPerson throws when name is empty
 createPerson throws when age is negative
 createPerson accepts age of zero
+createPerson throws when age exceeds maximum
 createPerson throws when profession is blank
 createPerson throws when profession is whitespace
 createPerson throws when city is blank
@@ -115,48 +116,61 @@ Uses `MockPersonRepository` - a configurable mock that allows setting expected r
 
 ---
 
-## 3. HandlebarsTest.kt (13 Tests)
+## 3. HandlebarsTest.kt (22 Tests)
 
-**Purpose:** Unit tests for Handlebars template engine and custom helpers.
+**Purpose:** Unit tests for Handlebars template engine, custom helpers, and dynamic rendering.
 
 ### Test Coverage
 
 | Category | Tests | Description |
 |----------|-------|-------------|
+| **FormatDate Helper** | 4 | Date formatting with nullable support |
+| **HTML Escape Helper** | 1 | HTML escaping for display |
+| **JS Escape Helper** | 3 | JavaScript escaping for inline handlers |
 | **Template Loading** | 1 | Loading templates from classpath |
-| **FormatDate Helper** | 3 | Date formatting functionality |
 | **HTML Structure** | 1 | Verifying HTML renders correctly |
+| **People Rendering** | 1 | Server-side rendering with data |
 | **Form Elements** | 1 | Verifying all form fields present |
 | **Action Buttons** | 1 | Verifying Edit/Delete buttons |
-| **Table Headers** | 1 | Verifying table structure |
-| **Stylesheet** | 1 | Verifying CSS link present |
-| **JavaScript** | 1 | Verifying API call handlers |
-| **Client-Side Rendering** | 1 | Verifying empty table body |
-| **Form Handlers** | 1 | Verifying form event listeners |
-| **Sanitization** | 1 | Verifying escapeHtml function |
+| **Table Headers** | 1 | Verifying table with sort links |
+| **Search/Filter** | 2 | Search form and filtered count |
+| **Empty States** | 2 | Empty list and search no results |
+| **Count Display** | 2 | Total and filtered count display |
+| **JavaScript/API** | 1 | Verifying API call handlers |
+| **Each Helper** | 1 | Iterating over people list |
 
 ### Specific Tests
 
 ```
-formatDate helper converts ISO datetime to date
+formatDate helper converts LocalDateTime to date
+formatDate helper converts ISO datetime string to date
 formatDate helper handles invalid datetime
 formatDate helper handles non-string input
+jsEscape helper escapes quotes and prevents XSS
+jsEscape helper escapes double quotes
+jsEscape helper escapes newlines
+htmlEscape helper escapes special characters
 template loads from classpath
 template renders HTML structure
+template renders people with server-side data
 template renders all required form fields
 template includes Edit and Delete buttons
-template includes table headers
+template includes table headers with sort links
 template links to external stylesheet
-template includes JavaScript for API calls
-template has empty table body for client-side rendering
-template includes add form handler
-template includes escapeHtml function for client-side sanitization
+template includes search form
+template shows empty state when no people
+template shows filtered message when searching
+template shows count when not filtered
+template shows filtered count when filtered
+template includes JavaScript for form handling
+each helper renders multiple people
 ```
 
 ### Custom Helpers Tested
 
-- `formatDate` - Converts ISO datetime strings to date format
-- `escape` - HTML escaping for user input
+- `formatDate` - Converts LocalDateTime or ISO datetime strings to date format (handles nullable)
+- `htmlEscape` - HTML escaping for displaying user content
+- `jsEscape` - JavaScript escaping for inline event handlers
 
 ---
 
@@ -195,6 +209,7 @@ DELETE api people returns error when not exists
 - Connects to real PostgreSQL database
 - Uses test-specific database configuration
 - Cleans up database after each test
+- Uses Handlebars for template rendering
 
 ### Requirements
 
@@ -210,41 +225,52 @@ DELETE api people returns error when not exists
 ┌─────────────────────────────────────────────────────────────┐
 │                     WebServer.kt                             │
 │                    (Spark Server)                            │
+│              - REST API endpoints                           │
+│              - Server-side template rendering               │
+│              - Search and sort filtering                     │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                  WebServerIntegrationTest.kt                 │
 │                   (Integration Tests)                       │
-│              Tests full HTTP endpoints                       │
+│              Tests full HTTP endpoints                     │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                    PersonService.kt                          │
 │                  (Business Logic)                           │
+│              - Validation                                   │
+│              - CRUD operations                             │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                  PersonRepository.kt                        │
 │                   (Data Access)                             │
+│              - JDBC operations                              │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                 PersonServiceTest.kt                        │
+│                 PersonServiceTest.kt                         │
 │         (Unit Tests - Mock Repository)                      │
+│              - Business logic validation                    │
 └─────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────┐
-│              PersonRepositoryTest.kt                        │
-│          (Unit Tests - In-Memory Repository)               │
+│              PersonRepositoryTest.kt                         │
+│          (Unit Tests - In-Memory Repository)                │
+│              - Data layer operations                       │
 └─────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────┐
-│                   HandlebarsTest.kt                        │
+│                   HandlebarsTest.kt                         │
 │              (Unit Tests - Template Engine)                 │
+│              - Template rendering                           │
+│              - Custom helpers                              │
+│              - Dynamic content                             │
 └─────────────────────────────────────────────────────────────┘
 ```
 

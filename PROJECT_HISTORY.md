@@ -151,10 +151,10 @@ get("/") { _, _ ->
 | Test Class | Tests |
 |------------|-------|
 | PersonRepositoryTest.kt | 14 |
-| PersonServiceTest.kt | 22 |
-| HandlebarsTest.kt | 13 |
+| PersonServiceTest.kt | 23 |
+| HandlebarsTest.kt | 22 |
 | WebServerIntegrationTest.kt | 11 |
-| **Total** | **60** |
+| **Total** | **70** |
 
 ---
 
@@ -204,6 +204,85 @@ src/main/resources/templates/
 
 ---
 
+## Dynamic Server-Side Rendering
+
+### Change: Full Dynamic Web Interface
+
+**Before:** Client-side JavaScript loaded data via API after page load
+
+**After:** Server-side rendering with search and sort functionality
+
+**New Features:**
+- **Search** - Filter people by name, profession, or city
+- **Sort** - Sort by any column (id, name, age, profession, city, created)
+- **Order** - Ascending or descending order
+- **Count Display** - Shows total and filtered count
+
+**Updated `WebServer.kt` - GET `/` route:**
+```kotlin
+get("/") { req, _ ->
+    val search = req.queryParams("search") ?: ""
+    val sortBy = req.queryParams("sort") ?: "id"
+    val order = req.queryParams("order") ?: "asc"
+
+    var people = service.getAllPeople()
+
+    // Filter by search
+    if (search.isNotBlank()) {
+        val searchLower = search.lowercase()
+        people = people.filter {
+            it.name.lowercase().contains(searchLower) ||
+            it.profession.lowercase().contains(searchLower) ||
+            it.city.lowercase().contains(searchLower)
+        }
+    }
+
+    // Sort people
+    people = when (sortBy) {
+        "name" -> if (order == "asc") people.sortedBy { it.name } else people.sortedByDescending { it.name }
+        "age" -> if (order == "asc") people.sortedBy { it.age } else people.sortedByDescending { it.age }
+        // ... other columns
+        else -> if (order == "asc") people.sortedBy { it.id } else people.sortedByDescending { it.id }
+    }
+
+    val totalCount = service.getAllPeople().size
+    val filteredCount = people.size
+
+    template.apply(mapOf(
+        "people" to people,
+        "search" to search,
+        "sortBy" to sortBy,
+        "order" to order,
+        "totalCount" to totalCount,
+        "filteredCount" to filteredCount,
+        "isFiltered" to (search.isNotBlank() || sortBy != "id")
+    ))
+}
+```
+
+**Updated `index.hbs` template:**
+```handlebars
+{{#each people}}
+<tr>
+    <td>{{id}}</td>
+    <td>{{name}}</td>
+    <td>{{age}}</td>
+    <td>{{profession}}</td>
+    <td>{{city}}</td>
+    <td>{{formatDate createdAt}}</td>
+</tr>
+{{/each}}
+```
+
+**URL Examples:**
+| Feature | URL |
+|---------|-----|
+| Search | `/?search=developer` |
+| Sort by name | `/?sort=name&order=asc` |
+| Combined | `/?search=dev&sort=age&order=desc` |
+
+---
+
 ## File Structure
 
 ```
@@ -249,11 +328,95 @@ dependencies {
 
 ---
 
+## Security Hardening
+
+### Issue: XSS Vulnerabilities
+
+**Problems Found:**
+1. User data in `editPerson()` inline JavaScript handler was not escaped
+2. Search query displayed without HTML escaping
+3. No input length limits on user data
+
+**Solutions Implemented:**
+
+1. **JavaScript Escaping Helper** - Added `jsEscape` helper for inline JavaScript:
+```kotlin
+hbs.registerHelper("jsEscape", object : Helper<Any?> {
+    override fun apply(context: Any?, options: Options): Any {
+        val str = context?.toString() ?: return ""
+        return str
+            .replace("\\", "\\\\")
+            .replace("'", "\\'")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            // ...
+    }
+})
+```
+
+2. **HTML Escaping Helper** - Added `htmlEscape` helper for displaying user content:
+```kotlin
+hbs.registerHelper("htmlEscape", object : Helper<Any?> {
+    override fun apply(context: Any?, options: Options): Any {
+        val str = context?.toString() ?: return ""
+        return str
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            // ...
+    }
+})
+```
+
+3. **Input Sanitization** - Added server-side sanitization:
+```kotlin
+private fun sanitizeSearchQuery(input: String): String {
+    return input
+        .take(100)  // Max length
+        .replace(Regex("[<>\"'&]"), "")  // Remove dangerous chars
+        .trim()
+}
+
+private fun sanitizeSortParam(input: String): String {
+    return when (input.lowercase()) {
+        "id", "name", "age", "profession", "city", "created" -> input.lowercase()
+        else -> "id"  // Whitelist validation
+    }
+}
+```
+
+4. **Input Validation** - Added max length and age validation:
+```kotlin
+const val MAX_NAME_LENGTH = 255
+const val MAX_PROFESSION_LENGTH = 255
+const val MAX_CITY_LENGTH = 255
+const val MAX_AGE = 150
+
+require(age <= MAX_AGE) { "Age cannot exceed $MAX_AGE" }
+```
+
+5. **Form Input Limits** - Added HTML5 validation:
+```html
+<input type="text" name="name" maxlength="255" required>
+<input type="number" name="age" min="0" max="150" required>
+```
+
+**Tests Added:**
+- `jsEscape helper escapes quotes and prevents XSS`
+- `jsEscape helper escapes double quotes`
+- `jsEscape helper escapes newlines`
+- `htmlEscape helper escapes special characters`
+- `createPerson throws when age exceeds maximum`
+
+---
+
 ## Current Status
 
-- **All 60 tests passing**
+- **All 69 tests passing**
 - **Web server running on port 4567**
 - **Auto-seed on every restart**
-- **Handlebars templates for HTML rendering**
+- **Handlebars templates with dynamic server-side rendering**
+- **Search and sort functionality**
 - **External CSS stylesheet**
 - **No build warnings**
+- **Security hardened with XSS protection**

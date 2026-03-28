@@ -2,9 +2,8 @@ package com.example
 
 import spark.Spark.*
 import com.github.jknack.handlebars.Handlebars
-import com.github.jknack.handlebars.Template
+import com.github.jknack.handlebars.Options
 import com.github.jknack.handlebars.io.ClassPathTemplateLoader
-import java.io.IOException
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import com.google.gson.GsonBuilder
@@ -29,41 +28,60 @@ fun main() {
 
     seedDatabaseIfEmpty(service)
 
-    val handlebars = Handlebars(ClassPathTemplateLoader("/templates", ".hbs"))
-        .registerHelper("escape") { context: Any, _: Any? ->
-            context.toString()
-        }
-        .registerHelper("formatDate") { context: Any, _: Any? ->
-            if (context is String) {
-                try {
-                    LocalDateTime.parse(context).toLocalDate().toString()
-                } catch (e: Exception) {
-                    context
-                }
-            } else context.toString()
-        }
+    val handlebars = createHandlebars()
 
     port(4567)
-
     staticFiles.location("/public")
 
-    get("/") { _, _ ->
-        val people = service.getAllPeople()
+    get("/") { req, _ ->
+        val search = sanitizeSearchQuery(req.queryParams("search") ?: "")
+        val sortBy = sanitizeSortParam(req.queryParams("sort") ?: "id")
+        val order = if (req.queryParams("order") == "desc") "desc" else "asc"
+
+        var people = service.getAllPeople()
+
+        if (search.isNotBlank()) {
+            val searchLower = search.lowercase()
+            people = people.filter {
+                it.name.lowercase().contains(searchLower) ||
+                it.profession.lowercase().contains(searchLower) ||
+                it.city.lowercase().contains(searchLower)
+            }
+        }
+
+        people = when (sortBy) {
+            "name" -> if (order == "asc") people.sortedBy { it.name } else people.sortedByDescending { it.name }
+            "age" -> if (order == "asc") people.sortedBy { it.age } else people.sortedByDescending { it.age }
+            "profession" -> if (order == "asc") people.sortedBy { it.profession } else people.sortedByDescending { it.profession }
+            "city" -> if (order == "asc") people.sortedBy { it.city } else people.sortedByDescending { it.city }
+            "created" -> if (order == "asc") people.sortedBy { it.createdAt } else people.sortedByDescending { it.createdAt }
+            else -> if (order == "asc") people.sortedBy { it.id } else people.sortedByDescending { it.id }
+        }
+
+        val totalCount = service.getAllPeople().size
+        val filteredCount = people.size
+
         val template = handlebars.compile("index")
-        template.apply(mapOf("people" to people))
+        template.apply(mapOf(
+            "people" to people,
+            "search" to htmlEscape(search),
+            "sortBy" to sortBy,
+            "order" to order,
+            "totalCount" to totalCount,
+            "filteredCount" to filteredCount,
+            "isFiltered" to (search.isNotBlank() || sortBy != "id")
+        ))
     }
 
     get("/api/people") { _, _ ->
-        val people = service.getAllPeople()
-        gson.toJson(people)
+        gson.toJson(service.getAllPeople())
     }
 
     get("/api/people/:id") { req, _ ->
         val id = req.params(":id").toIntOrNull()
-        if (id == null) {
-            gson.toJson(mapOf("error" to "Invalid ID"))
-        } else {
-            service.getPerson(id)?.let { gson.toJson(it) } ?: gson.toJson(mapOf("error" to "Person not found"))
+        when {
+            id == null -> gson.toJson(mapOf("error" to "Invalid ID"))
+            else -> service.getPerson(id)?.let { gson.toJson(it) } ?: gson.toJson(mapOf("error" to "Person not found"))
         }
     }
 
@@ -105,6 +123,88 @@ fun main() {
     println("Server running at http://localhost:4567")
 }
 
+private fun sanitizeSearchQuery(input: String): String {
+    return input
+        .take(100)
+        .replace(Regex("[<>\"'&]"), "")
+        .trim()
+}
+
+private fun sanitizeSortParam(input: String): String {
+    return when (input.lowercase()) {
+        "id", "name", "age", "profession", "city", "created" -> input.lowercase()
+        else -> "id"
+    }
+}
+
+private fun htmlEscape(input: String): String {
+    return input
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+        .replace("'", "&#x27;")
+}
+
+private fun jsEscape(input: String): String {
+    return input
+        .replace("\\", "\\\\")
+        .replace("'", "\\'")
+        .replace("\"", "\\\"")
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+        .replace("\t", "\\t")
+}
+
+private fun createHandlebars(): Handlebars {
+    val hbs = Handlebars(ClassPathTemplateLoader("/templates", ".hbs"))
+    
+    hbs.registerHelper("htmlEscape", object : com.github.jknack.handlebars.Helper<Any?> {
+        override fun apply(context: Any?, options: Options): Any {
+            val str = context?.toString() ?: return ""
+            return htmlEscape(str)
+        }
+    })
+    
+    hbs.registerHelper("jsEscape", object : com.github.jknack.handlebars.Helper<Any?> {
+        override fun apply(context: Any?, options: Options): Any {
+            val str = context?.toString() ?: return ""
+            return jsEscape(str)
+        }
+    })
+    
+    hbs.registerHelper("formatDate", object : com.github.jknack.handlebars.Helper<Any?> {
+        override fun apply(context: Any?, options: Options): Any {
+            if (context == null) return ""
+            return when (context) {
+                is LocalDateTime -> context.toLocalDate().toString()
+                is String -> {
+                    try {
+                        LocalDateTime.parse(context).toLocalDate().toString()
+                    } catch (e: Exception) {
+                        context
+                    }
+                }
+                else -> context.toString()
+            }
+        }
+    })
+    
+    hbs.registerHelper("eq", object : com.github.jknack.handlebars.Helper<Any?> {
+        override fun apply(context: Any?, options: Options): Any {
+            if (context == null) return options.inverse()
+            val args = options.params
+            return if (args.isNotEmpty() && context.toString() == args[0].toString()) {
+                options.fn()
+            } else {
+                options.inverse()
+            }
+        }
+    })
+    
+    return hbs
+}
+
 private fun seedDatabaseIfEmpty(service: PersonService) {
     println("Seeding database with sample data...")
     val people = listOf(
@@ -140,11 +240,7 @@ class LocalDateTimeAdapter : TypeAdapter<LocalDateTime>() {
     private val formatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME
 
     override fun write(out: JsonWriter, value: LocalDateTime?) {
-        if (value == null) {
-            out.nullValue()
-        } else {
-            out.value(value.format(formatter))
-        }
+        if (value == null) out.nullValue() else out.value(value.format(formatter))
     }
 
     override fun read(reader: JsonReader): LocalDateTime? {
