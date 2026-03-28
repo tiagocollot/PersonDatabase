@@ -410,9 +410,60 @@ require(age <= MAX_AGE) { "Age cannot exceed $MAX_AGE" }
 
 ---
 
+## Additional Security Hardening
+
+### Issue: Missing Security Headers and Rate Limiting
+
+**Problems Found:**
+1. No security headers to protect against clickjacking, XSS, etc.
+2. No rate limiting - API could be abused
+3. No global error handling - stack traces could be exposed
+
+**Solutions Implemented:**
+
+1. **Security Headers** - Added via `addSecurityHeaders()`:
+```kotlin
+res.header("X-Frame-Options", "DENY")
+res.header("X-Content-Type-Options", "nosniff")
+res.header("X-XSS-Protection", "1; mode=block")
+res.header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+res.header("Content-Security-Policy", "default-src 'self'; ...")
+res.header("Referrer-Policy", "strict-origin-when-cross-origin")
+res.header("Cache-Control", "no-store, no-cache, must-revalidate")
+```
+
+2. **Rate Limiting** - Added via `RateLimiter` object:
+```kotlin
+object RateLimiter {
+    private const val MAX_REQUESTS = 100
+    private const val WINDOW_MS = 60_000L  // 1 minute
+    
+    fun isAllowed(ip: String): Boolean { ... }
+    fun getRemaining(ip: String): Int { ... }
+    fun getResetTime(ip: String): Long { ... }
+}
+```
+
+3. **Global Error Handling** - Added `/error` endpoint for 500 errors:
+```kotlin
+get("/error") { _, res ->
+    res.status(500)
+    gson.toJson(mapOf("error" to "An unexpected error occurred."))
+}
+```
+
+4. **Rate Limit Headers** - API responses include:
+```
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 95
+X-RateLimit-Reset: 45
+```
+
+---
+
 ## Current Status
 
-- **All 69 tests passing**
+- **All 70 tests passing**
 - **Web server running on port 4567**
 - **Auto-seed on every restart**
 - **Handlebars templates with dynamic server-side rendering**
@@ -420,3 +471,6 @@ require(age <= MAX_AGE) { "Age cannot exceed $MAX_AGE" }
 - **External CSS stylesheet**
 - **No build warnings**
 - **Security hardened with XSS protection**
+- **Security headers configured (CSP, X-Frame-Options, etc.)**
+- **Rate limiting implemented (100 req/min)**
+- **Global error handling**

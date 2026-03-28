@@ -10,10 +10,46 @@ import com.google.gson.GsonBuilder
 import com.google.gson.TypeAdapter
 import com.google.gson.stream.JsonReader
 import com.google.gson.stream.JsonWriter
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 
 val gson = GsonBuilder()
     .registerTypeAdapter(LocalDateTime::class.java, LocalDateTimeAdapter())
     .create()
+
+object RateLimiter {
+    private val requests = ConcurrentHashMap<String, RateLimitEntry>()
+    private const val MAX_REQUESTS = 100
+    private const val WINDOW_MS = 60_000L
+
+    data class RateLimitEntry(
+        val count: AtomicInteger = AtomicInteger(1),
+        val windowStart: Long = System.currentTimeMillis()
+    )
+
+    fun isAllowed(ip: String): Boolean {
+        val now = System.currentTimeMillis()
+        val entry = requests.compute(ip) { _, existing ->
+            if (existing == null || now - existing.windowStart > WINDOW_MS) {
+                RateLimitEntry(AtomicInteger(1), now)
+            } else {
+                existing.count.incrementAndGet()
+                existing
+            }
+        }
+        return entry!!.count.get() <= MAX_REQUESTS
+    }
+
+    fun getRemaining(ip: String): Int {
+        val entry = requests[ip] ?: return MAX_REQUESTS
+        return maxOf(0, MAX_REQUESTS - entry.count.get())
+    }
+
+    fun getResetTime(ip: String): Long {
+        val entry = requests[ip] ?: return 0
+        return maxOf(0, entry.windowStart + WINDOW_MS - System.currentTimeMillis())
+    }
+}
 
 fun main() {
     val dbUrl = System.getenv("DB_URL") ?: "jdbc:postgresql://localhost:5432/persondb"
@@ -32,6 +68,9 @@ fun main() {
 
     port(4567)
     staticFiles.location("/public")
+    enableCORS()
+    addSecurityHeaders()
+    initRateLimiter()
 
     get("/") { req, _ ->
         val search = sanitizeSearchQuery(req.queryParams("search") ?: "")
@@ -73,45 +112,57 @@ fun main() {
         ))
     }
 
-    get("/api/people") { _, _ ->
+    get("/api/people") { req, res ->
+        res.header("X-RateLimit-Limit", "100")
+        res.header("X-RateLimit-Remaining", RateLimiter.getRemaining(req.ip()).toString())
+        res.header("X-RateLimit-Reset", (RateLimiter.getResetTime(req.ip()) / 1000).toString())
         gson.toJson(service.getAllPeople())
     }
 
-    get("/api/people/:id") { req, _ ->
+    get("/api/people/:id") { req, res ->
         val id = req.params(":id").toIntOrNull()
+        res.header("X-RateLimit-Remaining", RateLimiter.getRemaining(req.ip()).toString())
         when {
             id == null -> gson.toJson(mapOf("error" to "Invalid ID"))
             else -> service.getPerson(id)?.let { gson.toJson(it) } ?: gson.toJson(mapOf("error" to "Person not found"))
         }
     }
 
-    post("/api/people") { req, _ ->
+    post("/api/people") { req, res ->
         try {
             val body = gson.fromJson(req.body(), PersonRequest::class.java)
             val person = service.createPerson(body.name, body.age, body.profession, body.city)
+            res.header("X-RateLimit-Remaining", RateLimiter.getRemaining(req.ip()).toString())
             gson.toJson(mapOf("success" to true, "data" to person))
         } catch (e: IllegalArgumentException) {
+            res.header("X-RateLimit-Remaining", RateLimiter.getRemaining(req.ip()).toString())
             gson.toJson(mapOf("success" to false, "error" to (e.message ?: "Unknown error")))
         }
     }
 
-    put("/api/people/:id") { req, _ ->
+    put("/api/people/:id") { req, res ->
         try {
             val id = req.params(":id").toIntOrNull() ?: throw IllegalArgumentException("Invalid ID")
             val body = gson.fromJson(req.body(), PersonRequest::class.java)
             val person = service.updatePerson(id, body.name, body.age, body.profession, body.city)
+            res.header("X-RateLimit-Remaining", RateLimiter.getRemaining(req.ip()).toString())
             if (person != null) {
                 gson.toJson(mapOf("success" to true, "data" to person))
             } else {
                 gson.toJson(mapOf("success" to false, "error" to "Person not found"))
             }
         } catch (e: IllegalArgumentException) {
+            res.header("X-RateLimit-Remaining", RateLimiter.getRemaining(req.ip()).toString())
             gson.toJson(mapOf("success" to false, "error" to (e.message ?: "Unknown error")))
         }
     }
 
-    delete("/api/people/:id") { req, _ ->
-        val id = req.params(":id").toIntOrNull() ?: return@delete gson.toJson(mapOf("success" to false, "error" to "Invalid ID"))
+    delete("/api/people/:id") { req, res ->
+        val id = req.params(":id").toIntOrNull()
+        res.header("X-RateLimit-Remaining", RateLimiter.getRemaining(req.ip()).toString())
+        if (id == null) {
+            return@delete gson.toJson(mapOf("success" to false, "error" to "Invalid ID"))
+        }
         val deleted = service.deletePerson(id)
         if (deleted) {
             gson.toJson(mapOf("success" to true))
@@ -121,6 +172,58 @@ fun main() {
     }
 
     println("Server running at http://localhost:4567")
+}
+
+private fun enableCORS() {
+    options("/*") { req, res ->
+        val headers = req.headers("Access-Control-Request-Method")
+        if (headers != null) {
+            res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+            res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+            res.header("Access-Control-Max-Age", "86400")
+        }
+        res.header("Access-Control-Allow-Origin", "*")
+        res.header("Vary", "Origin")
+        res.status(204)
+        res.body("")
+    }
+
+    before("/*") { _, res ->
+        res.header("Access-Control-Allow-Origin", "*")
+    }
+}
+
+private fun addSecurityHeaders() {
+    after("/*") { _, res ->
+        res.header("X-Frame-Options", "DENY")
+        res.header("X-Content-Type-Options", "nosniff")
+        res.header("X-XSS-Protection", "1; mode=block")
+        res.header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+        res.header("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self';")
+        res.header("Referrer-Policy", "strict-origin-when-cross-origin")
+        res.header("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+        res.header("Cache-Control", "no-store, no-cache, must-revalidate")
+        res.header("Pragma", "no-cache")
+        res.header("Expires", "0")
+    }
+
+    get("/error") { _, res ->
+        res.status(500)
+        res.type("application/json")
+        gson.toJson(mapOf("error" to "An unexpected error occurred. Please try again later."))
+    }
+}
+
+private fun initRateLimiter() {
+    before("/*") { req, _ ->
+        val ip = req.ip()
+        if (!RateLimiter.isAllowed(ip)) {
+            halt(429, gson.toJson(mapOf(
+                "error" to "Too many requests. Please try again later.",
+                "retryAfter" to (RateLimiter.getResetTime(ip) / 1000)
+            )))
+        }
+    }
 }
 
 private fun sanitizeSearchQuery(input: String): String {
