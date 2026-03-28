@@ -21,9 +21,11 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("com.github.jknack:handlebars:4.3.1")
     
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.1")
+    testImplementation("org.junit.jupiter:junit-jupiter-engine:5.10.1")
+    testImplementation("org.junit.platform:junit-platform-launcher:1.10.1")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5:1.9.22")
     testImplementation("com.h2database:h2:2.2.224")
-    testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
 }
 
 tasks.test {
