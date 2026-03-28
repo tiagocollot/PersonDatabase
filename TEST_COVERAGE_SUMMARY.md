@@ -11,8 +11,10 @@ This document outlines all test categories and their coverage.
 | PersonRepositoryTest.kt | Unit | 14 | Test data layer with in-memory repository |
 | PersonServiceTest.kt | Unit | 23 | Test business logic with mocked repository |
 | HandlebarsTest.kt | Unit | 22 | Test Handlebars template rendering |
+| RateLimiterTest.kt | Unit | 9 | Test rate limiting functionality |
+| SecurityTest.kt | Unit | 15 | Test sanitization and security helpers |
 | WebServerIntegrationTest.kt | Integration | 11 | Test full HTTP endpoints with database |
-| **Total** | | **70** | |
+| **Total** | | **94** | |
 
 ---
 
@@ -219,6 +221,73 @@ DELETE api people returns error when not exists
 
 ---
 
+## 5. RateLimiterTest.kt (9 Tests)
+
+**Purpose:** Unit tests for rate limiting functionality.
+
+### Test Coverage
+
+| Category | Tests | Description |
+|----------|-------|-------------|
+| **Allow/Deny** | 3 | First request, within limit, exceeded |
+| **IP Isolation** | 1 | Different IPs have separate limits |
+| **Remaining Count** | 2 | Correct remaining count calculation |
+| **Reset Time** | 2 | Reset time calculation |
+| **Thread Safety** | 1 | Concurrent requests handling |
+
+### Specific Tests
+
+```
+isAllowed returns true for first request
+isAllowed returns true within limit
+isAllowed returns false when limit exceeded
+different IPs have separate limits
+getRemaining returns correct count
+getRemaining returns max for new IP
+getResetTime returns positive for existing IP
+getResetTime returns zero for new IP
+thread safety - concurrent requests
+```
+
+---
+
+## 6. SecurityTest.kt (15 Tests)
+
+**Purpose:** Unit tests for security sanitization and helpers.
+
+### Test Coverage
+
+| Category | Tests | Description |
+|----------|-------|-------------|
+| **Search Sanitization** | 4 | Dangerous chars, length, trimming, valid input |
+| **Sort Validation** | 4 | Valid columns, invalid fallback, case, SQL injection |
+| **HTML Escape** | 2 | Character escaping, empty string |
+| **JS Escape** | 2 | Quote escaping, empty string |
+| **Constants** | 2 | MAX_AGE and MAX_NAME_LENGTH validation |
+| **XSS Prevention** | 1 | Multiple XSS payloads blocked |
+
+### Specific Tests
+
+```
+sanitizeSearchQuery removes dangerous characters
+sanitizeSearchQuery limits length to 100
+sanitizeSearchQuery trims whitespace
+sanitizeSearchQuery preserves valid input
+sanitizeSortParam accepts valid columns
+sanitizeSortParam returns id for invalid input
+sanitizeSortParam is case insensitive
+sanitizeSortParam handles SQL injection attempt
+htmlEscape escapes all dangerous characters
+htmlEscape handles empty string
+jsEscape escapes quotes and special chars
+jsEscape handles empty string
+MAX_AGE validation works
+MAX_NAME_LENGTH validation works
+search query sanitization prevents XSS
+```
+
+---
+
 ## Test Architecture
 
 ```
@@ -260,17 +329,31 @@ DELETE api people returns error when not exists
 └─────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────┐
-│              PersonRepositoryTest.kt                         │
-│          (Unit Tests - In-Memory Repository)                │
-│              - Data layer operations                       │
+│              PersonRepositoryTest.kt                        │
+│          (Unit Tests - In-Memory Repository)               │
 └─────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────┐
 │                   HandlebarsTest.kt                         │
-│              (Unit Tests - Template Engine)                 │
-│              - Template rendering                           │
-│              - Custom helpers                              │
-│              - Dynamic content                             │
+│              (Unit Tests - Template Engine)                │
+│              - Template rendering                          │
+│              - Custom helpers                             │
+│              - Dynamic content                            │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                   RateLimiterTest.kt                        │
+│              (Unit Tests - Rate Limiting)                  │
+│              - IP-based rate limiting                     │
+│              - Thread safety                              │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                    SecurityTest.kt                          │
+│              (Unit Tests - Security)                       │
+│              - Input sanitization                         │
+│              - XSS prevention                             │
+│              - Validation helpers                         │
 └─────────────────────────────────────────────────────────────┘
 ```
 

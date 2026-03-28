@@ -363,8 +363,10 @@ CREATE TABLE people (
 | PersonRepositoryTest.kt | 14 |
 | PersonServiceTest.kt | 23 |
 | HandlebarsTest.kt | 22 |
+| RateLimiterTest.kt | 9 |
+| SecurityTest.kt | 15 |
 | WebServerIntegrationTest.kt | 11 |
-| **Total** | **70** |
+| **Total** | **94** |
 
 **Note:** Integration tests require PostgreSQL running. Ensure the database is available before running tests.
 

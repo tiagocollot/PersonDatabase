@@ -153,8 +153,10 @@ get("/") { _, _ ->
 | PersonRepositoryTest.kt | 14 |
 | PersonServiceTest.kt | 23 |
 | HandlebarsTest.kt | 22 |
+| RateLimiterTest.kt | 9 |
+| SecurityTest.kt | 15 |
 | WebServerIntegrationTest.kt | 11 |
-| **Total** | **70** |
+| **Total** | **94** |
 
 ---
 
@@ -463,7 +465,7 @@ X-RateLimit-Reset: 45
 
 ## Current Status
 
-- **All 70 tests passing**
+- **All 94 tests passing**
 - **Web server running on port 4567**
 - **Auto-seed on every restart**
 - **Handlebars templates with dynamic server-side rendering**
