@@ -300,10 +300,16 @@ src/main/resources/
     └── index.hbs         # Handlebars template for web interface
 
 src/test/kotlin/com/example/
-├── PersonRepositoryTest.kt        # Repository unit tests (14)
-├── PersonServiceTest.kt           # Service unit tests (22)
-├── HandlebarsTest.kt             # Template tests (13)
-└── WebServerIntegrationTest.kt   # Integration tests (11)
+├── unit/                          # Unit tests (no external dependencies)
+│   ├── PersonRepositoryTest.kt    # Repository unit tests (14)
+│   └── PersonServiceTest.kt       # Service unit tests (23)
+├── integration/                   # Integration tests (requires database)
+│   └── WebServerIntegrationTest.kt # Integration tests (10)
+├── security/                      # Security tests
+│   ├── RateLimiterTest.kt         # Rate limiting tests (9)
+│   └── SecurityTest.kt            # XSS/sanitization tests (15)
+└── template/                     # Template engine tests
+    └── HandlebarsTest.kt          # Template tests (22)
 ```
 
 ## Database Schema
@@ -358,15 +364,15 @@ CREATE TABLE people (
 ```
 
 **Test Summary:**
-| Test Class | Tests |
-|------------|-------|
-| PersonRepositoryTest.kt | 14 |
-| PersonServiceTest.kt | 23 |
-| HandlebarsTest.kt | 22 |
-| RateLimiterTest.kt | 9 |
-| SecurityTest.kt | 15 |
-| WebServerIntegrationTest.kt | 11 |
-| **Total** | **94** |
+| Folder | Test Class | Tests |
+|--------|------------|-------|
+| unit/ | PersonRepositoryTest.kt | 14 |
+| unit/ | PersonServiceTest.kt | 23 |
+| template/ | HandlebarsTest.kt | 22 |
+| security/ | RateLimiterTest.kt | 9 |
+| security/ | SecurityTest.kt | 15 |
+| integration/ | WebServerIntegrationTest.kt | 10 |
+| | **Total** | **93** |
 
 **Note:** Integration tests require PostgreSQL running. Ensure the database is available before running tests.
 

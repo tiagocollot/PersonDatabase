@@ -1,7 +1,10 @@
-package com.example
+package com.example.unit
 
+import com.example.Person
+import com.example.PersonRepositoryInterface
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
+import java.time.LocalDateTime
 
 class PersonRepositoryTest {
     private lateinit var repository: InMemoryPersonRepository

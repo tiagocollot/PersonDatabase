@@ -6,15 +6,15 @@ This document outlines all test categories and their coverage.
 
 ## Test Overview
 
-| Test Class | Type | Count | Purpose |
-|------------|------|-------|---------|
-| PersonRepositoryTest.kt | Unit | 14 | Test data layer with in-memory repository |
-| PersonServiceTest.kt | Unit | 23 | Test business logic with mocked repository |
-| HandlebarsTest.kt | Unit | 22 | Test Handlebars template rendering |
-| RateLimiterTest.kt | Unit | 9 | Test rate limiting functionality |
-| SecurityTest.kt | Unit | 15 | Test sanitization and security helpers |
-| WebServerIntegrationTest.kt | Integration | 11 | Test full HTTP endpoints with database |
-| **Total** | | **94** | |
+| Folder | Test Class | Type | Count | Purpose |
+|--------|------------|------|-------|---------|
+| unit/ | PersonRepositoryTest.kt | Unit | 14 | Test data layer with in-memory repository |
+| unit/ | PersonServiceTest.kt | Unit | 23 | Test business logic with mocked repository |
+| template/ | HandlebarsTest.kt | Unit | 22 | Test Handlebars template rendering |
+| security/ | RateLimiterTest.kt | Unit | 9 | Test rate limiting functionality |
+| security/ | SecurityTest.kt | Unit | 15 | Test sanitization and security helpers |
+| integration/ | WebServerIntegrationTest.kt | Integration | 10 | Test full HTTP endpoints with database |
+| | **Total** | | **93** | |
 
 ---
 
@@ -176,7 +176,7 @@ each helper renders multiple people
 
 ---
 
-## 4. WebServerIntegrationTest.kt (11 Tests)
+## 4. WebServerIntegrationTest.kt (10 Tests)
 
 **Purpose:** Integration tests for full HTTP endpoints with real PostgreSQL database.
 
@@ -291,6 +291,88 @@ search query sanitization prevents XSS
 ## Test Architecture
 
 ```
+src/test/kotlin/com/example/
+├── unit/                        # Unit tests (no external dependencies)
+│   ├── PersonRepositoryTest.kt  # Repository tests with in-memory storage
+│   └── PersonServiceTest.kt     # Service tests with mock repository
+│
+├── integration/                 # Integration tests (requires database)
+│   └── WebServerIntegrationTest.kt  # Full HTTP endpoint tests
+│
+├── security/                    # Security-focused unit tests
+│   ├── RateLimiterTest.kt      # Rate limiting tests
+│   └── SecurityTest.kt          # XSS/sanitization tests
+│
+└── template/                    # Template engine unit tests
+    └── HandlebarsTest.kt       # Handlebars helper & rendering tests
+```
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     WebServer.kt                             │
+│                    (Spark Server)                            │
+│              - REST API endpoints                           │
+│              - Server-side template rendering               │
+│              - Search and sort filtering                     │
+└─────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│           integration/WebServerIntegrationTest.kt           │
+│                   (Integration Tests)                       │
+│              Tests full HTTP endpoints                     │
+└─────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    PersonService.kt                          │
+│                  (Business Logic)                           │
+│              - Validation                                   │
+│              - CRUD operations                             │
+└─────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  PersonRepository.kt                         │
+│                   (Data Access)                             │
+│              - JDBC operations                              │
+└─────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 unit/PersonServiceTest.kt                   │
+│         (Unit Tests - Mock Repository)                      │
+│              - Business logic validation                    │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│              unit/PersonRepositoryTest.kt                   │
+│          (Unit Tests - In-Memory Repository)               │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                   template/HandlebarsTest.kt                │
+│              (Unit Tests - Template Engine)                 │
+│              - Template rendering                          │
+│              - Custom helpers                             │
+│              - Dynamic content                            │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                   security/RateLimiterTest.kt               │
+│              (Unit Tests - Rate Limiting)                  │
+│              - IP-based rate limiting                     │
+│              - Thread safety                              │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                    security/SecurityTest.kt                 │
+│              (Unit Tests - Security)                       │
+│              - Input sanitization                         │
+│              - XSS prevention                             │
+│              - Validation helpers                         │
+└─────────────────────────────────────────────────────────────┘
+```
 ┌─────────────────────────────────────────────────────────────┐
 │                     WebServer.kt                             │
 │                    (Spark Server)                            │
@@ -368,22 +450,22 @@ search query sanitization prevents XSS
 
 ### Run Specific Test Class
 ```bash
-./gradlew test --tests "com.example.PersonServiceTest"
-./gradlew test --tests "com.example.PersonRepositoryTest"
-./gradlew test --tests "com.example.HandlebarsTest"
-./gradlew test --tests "com.example.WebServerIntegrationTest"
+./gradlew test --tests "com.example.unit.PersonServiceTest"
+./gradlew test --tests "com.example.unit.PersonRepositoryTest"
+./gradlew test --tests "com.example.template.HandlebarsTest"
+./gradlew test --tests "com.example.integration.WebServerIntegrationTest"
 ```
 
 ### Run Unit Tests Only (No Database Required)
 ```bash
-./gradlew test --tests "com.example.PersonServiceTest"
-./gradlew test --tests "com.example.PersonRepositoryTest"
-./gradlew test --tests "com.example.HandlebarsTest"
+./gradlew test --tests "com.example.unit.*"
+./gradlew test --tests "com.example.template.*"
+./gradlew test --tests "com.example.security.*"
 ```
 
 ### Run Integration Tests (Requires Database)
 ```bash
-./gradlew test --tests "com.example.WebServerIntegrationTest"
+./gradlew test --tests "com.example.integration.*"
 ```
 
 ---

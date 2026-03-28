@@ -1,5 +1,6 @@
-package com.example
+package com.example.unit
 
+import com.example.Person
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
 import com.github.jknack.handlebars.Handlebars
@@ -12,9 +13,9 @@ class HandlebarsTest {
     private val handlebars = createHandlebars()
 
     private fun createHandlebars(): Handlebars {
-        val hbs = Handlebars(ClassPathTemplateLoader("/templates", ".hbs"))
+        val template = Handlebars(ClassPathTemplateLoader("/templates", ".hbs"))
         
-        hbs.registerHelper("htmlEscape", object : com.github.jknack.handlebars.Helper<Any?> {
+        template.registerHelper("htmlEscape", object : com.github.jknack.handlebars.Helper<Any?> {
             override fun apply(context: Any?, options: Options): Any {
                 val str = context?.toString() ?: return ""
                 return str
@@ -26,7 +27,7 @@ class HandlebarsTest {
             }
         })
         
-        hbs.registerHelper("jsEscape", object : com.github.jknack.handlebars.Helper<Any?> {
+        template.registerHelper("jsEscape", object : com.github.jknack.handlebars.Helper<Any?> {
             override fun apply(context: Any?, options: Options): Any {
                 val str = context?.toString() ?: return ""
                 return str
@@ -39,7 +40,7 @@ class HandlebarsTest {
             }
         })
         
-        hbs.registerHelper("formatDate", object : com.github.jknack.handlebars.Helper<Any?> {
+        template.registerHelper("formatDate", object : com.github.jknack.handlebars.Helper<Any?> {
             override fun apply(context: Any?, options: Options): Any {
                 if (context == null) return ""
                 return when (context) {
@@ -53,7 +54,7 @@ class HandlebarsTest {
             }
         })
         
-        hbs.registerHelper("eq", object : com.github.jknack.handlebars.Helper<Any?> {
+        template.registerHelper("eq", object : com.github.jknack.handlebars.Helper<Any?> {
             override fun apply(context: Any?, options: Options): Any {
                 if (context == null) return options.inverse()
                 val args = options.params
@@ -65,7 +66,7 @@ class HandlebarsTest {
             }
         })
         
-        return hbs
+        return template
     }
 
     @Test

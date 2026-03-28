@@ -361,10 +361,16 @@ src/main/resources/
     └── index.hbs
 
 src/test/kotlin/com/example/
-├── PersonRepositoryTest.kt
-├── PersonServiceTest.kt
-├── HandlebarsTest.kt
-└── WebServerIntegrationTest.kt
+├── unit/                          # Unit tests
+│   ├── PersonRepositoryTest.kt
+│   └── PersonServiceTest.kt
+├── integration/                   # Integration tests
+│   └── WebServerIntegrationTest.kt
+├── security/                     # Security tests
+│   ├── RateLimiterTest.kt
+│   └── SecurityTest.kt
+└── template/                    # Template tests
+    └── HandlebarsTest.kt
 ```
 
 ### Dependencies

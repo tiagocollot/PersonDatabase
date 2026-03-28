@@ -1,5 +1,9 @@
-package com.example
+package com.example.integration
 
+import com.example.DatabaseConfig
+import com.example.Person
+import com.example.PersonRepository
+import com.example.PersonService
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
 import org.opentest4j.TestAbortedException
