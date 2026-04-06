@@ -4,8 +4,6 @@ A Kotlin application with PostgreSQL for managing person records using raw JDBC.
 
 ## About This Project
 
-This project was created using **[OpenCode](https://opencode.ai)** with the **big-pickle** agent, following **Test-Driven Development (TDD)** methodology.
-
 All features were developed using TDD:
 - Tests written first
 - Implementation follows to make tests pass
