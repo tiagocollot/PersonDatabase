@@ -210,6 +210,23 @@ class PersonServiceTest {
 
         assertFalse(result)
     }
+
+    @Test
+    fun `clearAllPeople removes all people`() {
+        repository.addPerson(Person(1, "John", 30, "Dev", "NYC"))
+        repository.addPerson(Person(2, "Jane", 25, "Designer", "LA"))
+
+        service.clearAllPeople()
+
+        assertTrue(service.getAllPeople().isEmpty())
+    }
+
+    @Test
+    fun `clearAllPeople on empty repository does nothing`() {
+        service.clearAllPeople()
+
+        assertTrue(service.getAllPeople().isEmpty())
+    }
 }
 
 class MockPersonRepository : PersonRepositoryInterface {
@@ -254,4 +271,9 @@ class MockPersonRepository : PersonRepositoryInterface {
     }
 
     override fun delete(id: Int): Boolean = deleteResult
+
+    override fun clearAll() {
+        storage.clear()
+        nextId = 1
+    }
 }

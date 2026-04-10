@@ -39,6 +39,8 @@ class PersonService(private val repository: PersonRepositoryInterface) {
 
     fun deletePerson(id: Int): Boolean = repository.delete(id)
 
+    fun clearAllPeople() = repository.clearAll()
+
     private fun validateInput(name: String, age: Int, profession: String, city: String) {
         require(name.isNotBlank()) { "Name cannot be blank" }
         require(age >= 0) { "Age cannot be negative" }

@@ -9,6 +9,7 @@ interface PersonRepositoryInterface {
     fun findAll(): List<Person>
     fun update(id: Int, person: Person): Person?
     fun delete(id: Int): Boolean
+    fun clearAll()
 }
 
 class PersonRepository : PersonRepositoryInterface {
@@ -81,6 +82,12 @@ class PersonRepository : PersonRepositoryInterface {
         DatabaseConfig.getConnection().prepareStatement(sql).use { stmt ->
             stmt.setInt(1, id)
             return stmt.executeUpdate() > 0
+        }
+    }
+
+    override fun clearAll() {
+        DatabaseConfig.getConnection().createStatement().use { stmt ->
+            stmt.execute("TRUNCATE TABLE people RESTART IDENTITY")
         }
     }
 

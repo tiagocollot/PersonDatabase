@@ -205,6 +205,67 @@ class WebServerIntegrationTest {
         assertEquals("Person not found", result["error"])
     }
 
+    @Test
+    fun `seeding twice does not duplicate rows - always exactly 20 people`() {
+        // First seed already happened in startServer via reseedDatabase
+        val firstCount = gson.fromJson(
+            sendGet("$baseUrl/api/people")["body"] as String,
+            Array<Person>::class.java
+        ).size
+
+        // Simulate a second server restart by calling reseed again directly
+        val service = PersonService(PersonRepository())
+        service.clearAllPeople()
+        val seedPeople = listOf(
+            Person(0, "Alice Johnson", 28, "Software Engineer", "San Francisco"),
+            Person(0, "Bob Smith", 35, "Data Scientist", "New York"),
+            Person(0, "Carol Williams", 42, "Product Manager", "Seattle"),
+            Person(0, "David Brown", 31, "Frontend Developer", "Austin"),
+            Person(0, "Emma Davis", 26, "UX Designer", "Portland"),
+            Person(0, "Frank Miller", 39, "DevOps Engineer", "Chicago"),
+            Person(0, "Grace Wilson", 33, "Backend Developer", "Boston"),
+            Person(0, "Henry Taylor", 45, "CTO", "Los Angeles"),
+            Person(0, "Ivy Anderson", 29, "QA Engineer", "Denver"),
+            Person(0, "Jack Thomas", 37, "Full Stack Developer", "Miami"),
+            Person(0, "Karen Martinez", 24, "Junior Developer", "Phoenix"),
+            Person(0, "Leo Garcia", 41, "Tech Lead", "San Diego"),
+            Person(0, "Mia Robinson", 30, "Mobile Developer", "Nashville"),
+            Person(0, "Noah Clark", 36, "Cloud Architect", "Atlanta"),
+            Person(0, "Olivia Lewis", 27, "UI Designer", "Dallas"),
+            Person(0, "Peter Hall", 48, "VP Engineering", "Philadelphia"),
+            Person(0, "Quinn Young", 32, "Security Engineer", "Minneapolis"),
+            Person(0, "Rachel King", 25, "Junior Designer", "Orlando"),
+            Person(0, "Sam Wright", 38, "Solutions Architect", "Houston"),
+            Person(0, "Tina Scott", 34, "Scrum Master", "Detroit")
+        )
+        seedPeople.forEach { service.createPerson(it.name, it.age, it.profession, it.city) }
+
+        val secondCount = gson.fromJson(
+            sendGet("$baseUrl/api/people")["body"] as String,
+            Array<Person>::class.java
+        ).size
+
+        assertEquals(20, firstCount, "First seed should produce exactly 20 people")
+        assertEquals(20, secondCount, "Second seed should still be exactly 20 people - no duplicates")
+    }
+
+    @Test
+    fun `inserting duplicate name profession and city is rejected`() {
+        // Alice Johnson / Software Engineer / San Francisco is in the seed data
+        val response = sendPost(
+            "$baseUrl/api/people",
+            mapOf(
+                "name" to "Alice Johnson",
+                "age" to 99,
+                "profession" to "Software Engineer",
+                "city" to "San Francisco"
+            )
+        )
+
+        val result = gson.fromJson(response["body"] as String, Map::class.java)
+        assertEquals(false, result["success"], "Inserting a duplicate should return success=false")
+    }
+
     private fun sendGet(urlString: String): Map<String, Any> {
         val url = URL(urlString)
         val connection = url.openConnection() as HttpURLConnection
@@ -368,7 +429,7 @@ object WebServerMain {
         val repository = PersonRepository()
         val service = PersonService(repository)
 
-        seedDatabaseIfEmpty(service)
+        reseedDatabase(service)
 
         Spark.port(4567)
         Spark.staticFiles.location("/public")
@@ -433,6 +494,12 @@ object WebServerMain {
                 gson.toJson(mapOf("success" to true, "data" to person))
             } catch (e: IllegalArgumentException) {
                 gson.toJson(mapOf("success" to false, "error" to (e.message ?: "Unknown error")))
+            } catch (e: Exception) {
+                val msg = if (e.message?.contains("unique", ignoreCase = true) == true ||
+                             e.message?.contains("duplicate", ignoreCase = true) == true)
+                    "A person with that name, profession, and city already exists"
+                else "An unexpected error occurred"
+                gson.toJson(mapOf("success" to false, "error" to msg))
             }
         }
 
@@ -462,7 +529,8 @@ object WebServerMain {
         }
     }
 
-    private fun seedDatabaseIfEmpty(service: PersonService) {
+    private fun reseedDatabase(service: PersonService) {
+        service.clearAllPeople()
         val people = listOf(
             Person(0, "Alice Johnson", 28, "Software Engineer", "San Francisco"),
             Person(0, "Bob Smith", 35, "Data Scientist", "New York"),
@@ -513,7 +581,8 @@ object TestDatabaseConfig {
                     age INTEGER NOT NULL,
                     profession VARCHAR(255) NOT NULL,
                     city VARCHAR(255) NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT people_name_profession_city_unique UNIQUE (name, profession, city)
                 )
             """.trimIndent())
         }

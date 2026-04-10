@@ -4,7 +4,6 @@ import com.example.Person
 import com.example.PersonRepositoryInterface
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
-import java.time.LocalDateTime
 
 class PersonRepositoryTest {
     private lateinit var repository: InMemoryPersonRepository
@@ -142,6 +141,42 @@ class PersonRepositoryTest {
         val result = repository.delete(9999)
         assertFalse(result)
     }
+
+    @Test
+    fun `clearAll removes all persons`() {
+        repository.save(Person(0, "Alice", 25, "Engineer", "Boston"))
+        repository.save(Person(0, "Bob", 30, "Designer", "Seattle"))
+
+        repository.clearAll()
+
+        assertTrue(repository.findAll().isEmpty())
+    }
+
+    @Test
+    fun `clearAll resets id sequence so next id starts from 1`() {
+        repository.save(Person(0, "Alice", 25, "Engineer", "Boston"))
+        repository.clearAll()
+
+        val saved = repository.save(Person(0, "Bob", 30, "Designer", "Seattle"))
+
+        assertEquals(1, saved.id)
+    }
+
+    @Test
+    fun `clearAll on empty repository does nothing`() {
+        repository.clearAll()
+
+        assertTrue(repository.findAll().isEmpty())
+    }
+
+    @Test
+    fun `save throws when duplicate name profession and city exist`() {
+        repository.save(Person(0, "Alice", 25, "Engineer", "Boston"))
+
+        assertThrows<IllegalStateException> {
+            repository.save(Person(0, "Alice", 30, "Engineer", "Boston"))
+        }
+    }
 }
 
 class InMemoryPersonRepository : PersonRepositoryInterface {
@@ -149,6 +184,13 @@ class InMemoryPersonRepository : PersonRepositoryInterface {
     private var nextId = 1
 
     override fun save(person: Person): Person {
+        val duplicate = storage.values.any {
+            it.name == person.name &&
+            it.profession == person.profession &&
+            it.city == person.city
+        }
+        check(!duplicate) { "Duplicate: a person with name '${person.name}', profession '${person.profession}', city '${person.city}' already exists" }
+
         val id = nextId++
         val now = java.time.LocalDateTime.now()
         val saved = person.copy(id = id, createdAt = now)
@@ -171,4 +213,9 @@ class InMemoryPersonRepository : PersonRepositoryInterface {
     }
 
     override fun delete(id: Int): Boolean = storage.remove(id) != null
+
+    override fun clearAll() {
+        storage.clear()
+        nextId = 1
+    }
 }

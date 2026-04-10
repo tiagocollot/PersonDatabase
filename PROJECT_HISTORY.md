@@ -471,11 +471,94 @@ X-RateLimit-Reset: 45
 
 ---
 
+## Fix: Database Duplication on Restart
+
+### Issue: Seed Data Duplicating on Every Server Start
+
+**Problem:** Every time the server started, `seedDatabaseIfEmpty` unconditionally inserted 20
+rows regardless of whether data already existed. Reopening a browser connection or restarting
+the app accumulated duplicates indefinitely.
+
+**Root cause:** A previous change removed the `if (service.getAllPeople().isEmpty())` guard
+without replacing it with any clearing logic.
+
+**Solutions Implemented:**
+
+1. **`clearAll()` on `PersonRepositoryInterface` and `PersonRepository`** — new method using
+`TRUNCATE TABLE people RESTART IDENTITY` to wipe all rows and reset the auto-increment ID
+sequence back to 1:
+```kotlin
+override fun clearAll() {
+    DatabaseConfig.getConnection().createStatement().use { stmt ->
+        stmt.execute("TRUNCATE TABLE people RESTART IDENTITY")
+    }
+}
+```
+
+2. **`clearAllPeople()` on `PersonService`** — thin delegation to the repository:
+```kotlin
+fun clearAllPeople() = repository.clearAll()
+```
+
+3. **`reseedDatabase()` in `WebServer.kt`** — renamed from `seedDatabaseIfEmpty` (honest
+naming) and now clears all existing data before inserting the 20 sample records:
+```kotlin
+private fun reseedDatabase(service: PersonService) {
+    println("Clearing existing data and re-seeding database...")
+    service.clearAllPeople()
+    // ... insert 20 records
+}
+```
+
+4. **Unique constraint at the DB level** — added as a safety net in `DatabaseConfig.initSchema()`:
+```sql
+CONSTRAINT people_name_profession_city_unique UNIQUE (name, profession, city)
+```
+
+5. **Duplicate-aware error handling** — `POST /api/people` now catches generic `Exception`
+alongside `IllegalArgumentException` so DB constraint violations return a human-readable
+`success=false` response instead of a 500 error:
+```kotlin
+} catch (e: Exception) {
+    val msg = if (e.message?.contains("unique", ignoreCase = true) == true || ...)
+        "A person with that name, profession, and city already exists"
+    else "An unexpected error occurred"
+    gson.toJson(mapOf("success" to false, "error" to msg))
+}
+```
+
+**Tests Added (+8, total 101):**
+
+| Test | Class |
+|------|-------|
+| `clearAll removes all persons` | `PersonRepositoryTest` |
+| `clearAll resets id sequence so next id starts from 1` | `PersonRepositoryTest` |
+| `clearAll on empty repository does nothing` | `PersonRepositoryTest` |
+| `save throws when duplicate name profession and city exist` | `PersonRepositoryTest` |
+| `clearAllPeople removes all people` | `PersonServiceTest` |
+| `clearAllPeople on empty repository does nothing` | `PersonServiceTest` |
+| `seeding twice does not duplicate rows - always exactly 20 people` | `WebServerIntegrationTest` |
+| `inserting duplicate name profession and city is rejected` | `WebServerIntegrationTest` |
+
+**Updated Test Structure:**
+| Test Class | Tests |
+|------------|-------|
+| PersonRepositoryTest.kt | 18 |
+| PersonServiceTest.kt | 25 |
+| HandlebarsTest.kt | 22 |
+| RateLimiterTest.kt | 9 |
+| SecurityTest.kt | 15 |
+| WebServerIntegrationTest.kt | 12 |
+| **Total** | **101** |
+
+---
+
 ## Current Status
 
-- **All 93 tests passing**
+- **All 101 tests passing**
 - **Web server running on port 4567**
-- **Auto-seed on every restart**
+- **Re-seeds cleanly on every restart (clear + insert — no duplication)**
+- **Unique constraint on (name, profession, city) enforced at DB level**
 - **Handlebars templates with dynamic server-side rendering**
 - **Search and sort functionality**
 - **External CSS stylesheet**

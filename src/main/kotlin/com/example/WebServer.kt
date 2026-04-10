@@ -62,7 +62,7 @@ fun main() {
     val repository = PersonRepository()
     val service = PersonService(repository)
 
-    seedDatabaseIfEmpty(service)
+    reseedDatabase(service)
 
     val handlebars = createHandlebars()
 
@@ -137,6 +137,13 @@ fun main() {
         } catch (e: IllegalArgumentException) {
             res.header("X-RateLimit-Remaining", RateLimiter.getRemaining(req.ip()).toString())
             gson.toJson(mapOf("success" to false, "error" to (e.message ?: "Unknown error")))
+        } catch (e: Exception) {
+            res.header("X-RateLimit-Remaining", RateLimiter.getRemaining(req.ip()).toString())
+            val msg = if (e.message?.contains("unique", ignoreCase = true) == true ||
+                         e.message?.contains("duplicate", ignoreCase = true) == true)
+                "A person with that name, profession, and city already exists"
+            else "An unexpected error occurred"
+            gson.toJson(mapOf("success" to false, "error" to msg))
         }
     }
 
@@ -308,8 +315,9 @@ private fun createHandlebars(): Handlebars {
     return hbs
 }
 
-private fun seedDatabaseIfEmpty(service: PersonService) {
-    println("Seeding database with sample data...")
+private fun reseedDatabase(service: PersonService) {
+    println("Clearing existing data and re-seeding database...")
+    service.clearAllPeople()
     val people = listOf(
             Person(0, "Alice Johnson", 28, "Software Engineer", "San Francisco"),
             Person(0, "Bob Smith", 35, "Data Scientist", "New York"),

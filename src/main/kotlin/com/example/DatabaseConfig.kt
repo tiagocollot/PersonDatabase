@@ -23,7 +23,8 @@ object DatabaseConfig {
                     age INTEGER NOT NULL,
                     profession VARCHAR(255) NOT NULL,
                     city VARCHAR(255) NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT people_name_profession_city_unique UNIQUE (name, profession, city)
                 )
             """.trimIndent())
         }
