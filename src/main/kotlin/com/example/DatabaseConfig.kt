@@ -27,6 +27,17 @@ object DatabaseConfig {
                     CONSTRAINT people_name_profession_city_unique UNIQUE (name, profession, city)
                 )
             """.trimIndent())
+            
+            stmt.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint WHERE conname = 'people_name_profession_city_unique'
+                    ) THEN
+                        ALTER TABLE people ADD CONSTRAINT people_name_profession_city_unique UNIQUE (name, profession, city);
+                    END IF;
+                END $$;
+            """.trimIndent())
         }
     }
 

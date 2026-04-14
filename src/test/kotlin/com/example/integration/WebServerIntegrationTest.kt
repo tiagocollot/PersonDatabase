@@ -264,6 +264,30 @@ class WebServerIntegrationTest {
 
         val result = gson.fromJson(response["body"] as String, Map::class.java)
         assertEquals(false, result["success"], "Inserting a duplicate should return success=false")
+        assertEquals("A person with that name, profession, and city already exists", result["error"])
+    }
+
+    @Test
+    fun `initSchema applies unique constraint migration safely`() {
+        val conn = DatabaseConfig.getConnection()
+        
+        val constraintExists = conn.createStatement().use { stmt ->
+            val rs = stmt.executeQuery("""
+                SELECT 1 FROM pg_constraint WHERE conname = 'people_name_profession_city_unique'
+            """)
+            rs.next()
+        }
+        
+        assertTrue(constraintExists, "Unique constraint should exist after initSchema")
+        
+        val hasIndex = conn.createStatement().use { stmt ->
+            val rs = stmt.executeQuery("""
+                SELECT 1 FROM pg_indexes WHERE indexname = 'people_name_profession_city_unique'
+            """)
+            rs.next()
+        }
+        
+        assertTrue(hasIndex, "Unique constraint should have an associated index")
     }
 
     private fun sendGet(urlString: String): Map<String, Any> {

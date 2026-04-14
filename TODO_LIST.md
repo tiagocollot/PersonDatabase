@@ -42,11 +42,12 @@ dependencies {
 ## Phase 2: Database Layer
 
 ### 2.1 Database Configuration
-- [ ] Create `DatabaseConfig.kt` object
-- [ ] Implement `connect(url, user, password)` function
-- [ ] Implement `getConnection()` function
-- [ ] Implement `initSchema()` to create `people` table
-- [ ] Implement `close()` function
+- [x] Create `DatabaseConfig.kt` object
+- [x] Implement `connect(url, user, password)` function
+- [x] Implement `getConnection()` function
+- [x] Implement `initSchema()` to create `people` table
+- [x] Implement `close()` function
+- [x] Implement constraint migration for existing databases
 
 ### 2.2 Person Data Class
 - [ ] Create `Person.kt` data class with:
@@ -177,12 +178,13 @@ dependencies {
 - [ ] Configure test task with JUnitPlatform
 
 ### 7.2 Repository Tests
-- [ ] Create `InMemoryPersonRepository` for testing
-- [ ] Write tests for `save` operation
-- [ ] Write tests for `findById` (found/not found)
-- [ ] Write tests for `findAll` (empty/non-empty)
-- [ ] Write tests for `update` (success/not found)
-- [ ] Write tests for `delete` (success/not found)
+- [x] Create `InMemoryPersonRepository` for testing
+- [x] Write tests for `save` operation
+- [x] Write tests for `findById` (found/not found)
+- [x] Write tests for `findAll` (empty/non-empty)
+- [x] Write tests for `update` (success/not found)
+- [x] Write tests for `delete` (success/not found)
+- [x] Write tests for duplicate prevention
 
 ### 7.3 Service Tests
 - [ ] Create `MockPersonRepository` for testing

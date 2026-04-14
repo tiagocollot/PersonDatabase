@@ -340,9 +340,12 @@ CREATE TABLE people (
     age INTEGER NOT NULL,
     profession VARCHAR(255) NOT NULL,
     city VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT people_name_profession_city_unique UNIQUE (name, profession, city)
 );
 ```
+
+> **Note:** The unique constraint prevents duplicate entries based on the combination of name, profession, and city. The application automatically applies this constraint migration on startup for existing databases.
 
 ## Person Fields
 
@@ -364,13 +367,13 @@ CREATE TABLE people (
 **Test Summary:**
 | Folder | Test Class | Tests |
 |--------|------------|-------|
-| unit/ | PersonRepositoryTest.kt | 14 |
-| unit/ | PersonServiceTest.kt | 23 |
+| unit/ | PersonRepositoryTest.kt | 15 |
+| unit/ | PersonServiceTest.kt | 25 |
 | template/ | HandlebarsTest.kt | 22 |
 | security/ | RateLimiterTest.kt | 9 |
 | security/ | SecurityTest.kt | 15 |
-| integration/ | WebServerIntegrationTest.kt | 10 |
-| | **Total** | **93** |
+| integration/ | WebServerIntegrationTest.kt | 13 |
+| | **Total** | **102** |
 
 **Note:** Integration tests require PostgreSQL running. Ensure the database is available before running tests.
 

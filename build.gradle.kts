@@ -30,6 +30,24 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    setMaxParallelForks(1)
+    testLogging {
+        events("passed", "skipped", "failed")
+        showExceptions = true
+        showCauses = true
+        showStackTraces = true
+        maxGranularity = 0
+    }
+    afterSuite(KotlinClosure2({ desc: TestDescriptor, result: TestResult ->
+        if (desc.parent == null) {
+            println("\n========================================")
+            println("Test Results: ${result.resultType}")
+            println("  Passed: ${result.successfulTestCount}")
+            println("  Failed: ${result.failedTestCount}")
+            println("  Skipped: ${result.skippedTestCount}")
+            println("========================================")
+        }
+    }))
 }
 
 kotlin {

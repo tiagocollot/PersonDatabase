@@ -527,7 +527,7 @@ alongside `IllegalArgumentException` so DB constraint violations return a human-
 }
 ```
 
-**Tests Added (+8, total 101):**
+**Tests Added (+9, total 102):**
 
 | Test | Class |
 |------|-------|
@@ -543,19 +543,62 @@ alongside `IllegalArgumentException` so DB constraint violations return a human-
 **Updated Test Structure:**
 | Test Class | Tests |
 |------------|-------|
-| PersonRepositoryTest.kt | 18 |
+| PersonRepositoryTest.kt | 15 |
 | PersonServiceTest.kt | 25 |
 | HandlebarsTest.kt | 22 |
 | RateLimiterTest.kt | 9 |
 | SecurityTest.kt | 15 |
-| WebServerIntegrationTest.kt | 12 |
-| **Total** | **101** |
+| WebServerIntegrationTest.kt | 13 |
+| **Total** | **102** |
+
+---
+
+## Fix: Unique Constraint Migration
+
+### Issue: Duplicate Prevention Not Applied to Existing Databases
+
+**Problem:** The UNIQUE constraint on `(name, profession, city)` was defined in `CREATE TABLE IF NOT EXISTS`, but this only creates the table if it doesn't exist. Since most databases already had the table without the constraint, duplicates could be inserted.
+
+**Root Cause:** `CREATE TABLE IF NOT EXISTS` does not modify existing tables - it only creates new ones if they don't exist.
+
+**Solution:** Added a migration step in `DatabaseConfig.initSchema()` that conditionally adds the constraint if it doesn't already exist:
+
+```kotlin
+fun initSchema() {
+    getConnection().createStatement().use { stmt ->
+        // Create table if not exists (with constraint)
+        stmt.execute("""
+            CREATE TABLE IF NOT EXISTS people (
+                ...
+                CONSTRAINT people_name_profession_city_unique UNIQUE (name, profession, city)
+            )
+        """.trimIndent())
+        
+        // Migration: Add constraint to existing tables
+        stmt.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint WHERE conname = 'people_name_profession_city_unique'
+                ) THEN
+                    ALTER TABLE people ADD CONSTRAINT people_name_profession_city_unique UNIQUE (name, profession, city);
+                END IF;
+            END $$;
+        """.trimIndent())
+    }
+}
+```
+
+**Test Added (+1, total 102):**
+| Test | Class |
+|------|-------|
+| `initSchema applies unique constraint migration safely` | `WebServerIntegrationTest` |
 
 ---
 
 ## Current Status
 
-- **All 101 tests passing**
+- **All 102 tests passing**
 - **Web server running on port 4567**
 - **Re-seeds cleanly on every restart (clear + insert — no duplication)**
 - **Unique constraint on (name, profession, city) enforced at DB level**
